@@ -1,25 +1,30 @@
 package com.example.uploadimage;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
-import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import java.io.File;
+
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
@@ -36,10 +41,23 @@ public class MainActivity extends AppCompatActivity {
     ProgressDialog progressDialog;
     TextView str1, str2;
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
+
 
         progressDialog = new ProgressDialog(this);
         progressDialog.setMessage("Uploading...");
@@ -85,12 +103,10 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     // Permission has already been granted
                 }
-                Intent galleryIntent = new Intent(Intent.ACTION_PICK,
-                        android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+                Intent galleryIntent = new Intent(Intent.ACTION_PICK, MediaStore.Video.Media.EXTERNAL_CONTENT_URI);
                 startActivityForResult(galleryIntent, 0);
             }
         });
-
 
 
     }
@@ -105,26 +121,28 @@ public class MainActivity extends AppCompatActivity {
 
                 // Get the Image from data
                 Uri selectedImage = data.getData();
-                String[] filePathColumn = {MediaStore.Images.Media.DATA};
 
-                Cursor cursor = getContentResolver().query(selectedImage, filePathColumn, null, null, null);
-                assert cursor != null;
-                cursor.moveToFirst();
+//                String[] filePathColumn = {MediaStore.Images.Media.DATA};
 
-                int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
-                mediaPath = cursor.getString(columnIndex);
+
+                mediaPath = getRealPathFromURI(selectedImage);
+
+//                Cursor cursor = getContentResolver().query(selectedImage, filePathColumn, null, null, null);
+//                assert cursor != null;
+//                cursor.moveToFirst();
+
+//                int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
+//                mediaPath = cursor.getString(columnIndex);
+                imgView.setImageURI(selectedImage);
                 str1.setText(mediaPath);
-                // Set the Image in ImageView for Previewing the Media
-                imgView.setImageBitmap(BitmapFactory.decodeFile(mediaPath));
-                cursor.close();
+//                cursor.close();
 
-            }
-            else {
+            } else {
                 Toast.makeText(this, "You haven't picked Image/Video", Toast.LENGTH_LONG).show();
             }
         } catch (Exception e) {
             Toast.makeText(this, "Something went wrong", Toast.LENGTH_LONG).show();
-            Log.d("MYTAG", "onActivityResult: "+e.getMessage());
+            Log.d("MYTAG", "onActivityResult: " + e.getMessage());
         }
 
     }
@@ -141,28 +159,48 @@ public class MainActivity extends AppCompatActivity {
         RequestBody name = RequestBody.create(MediaType.parse("text/plain"), file.getName());
 
         ApiConfig getResponse = AppConfig.getRetrofit().create(ApiConfig.class);
-        Call<ServerResponse> call = getResponse.uploadFile(name,image);
+        Call<ServerResponse> call = getResponse.uploadFile(name, image);
 
         call.enqueue(new Callback<ServerResponse>() {
 
             @Override
             public void onResponse(Call<ServerResponse> call, Response<ServerResponse> response) {
 
-             if (response.isSuccessful() && response.body()!=null){
+                if (response.isSuccessful() && response.body() != null) {
 
-                 Toast.makeText(getApplicationContext(), response.body().getName(), Toast.LENGTH_SHORT).show();
-                 progressDialog.dismiss();
+                    Toast.makeText(getApplicationContext(), response.body().getName(), Toast.LENGTH_SHORT).show();
+                    progressDialog.dismiss();
 
-             }
+                }
 
 
             }
 
             @Override
             public void onFailure(Call<ServerResponse> call, Throwable t) {
-                Toast.makeText(getApplicationContext(), "Error"+t, Toast.LENGTH_SHORT).show();
+                Toast.makeText(getApplicationContext(), "Error" + t, Toast.LENGTH_SHORT).show();
                 progressDialog.dismiss();
             }
         });
+    }
+
+    private String getRealPathFromURI(Uri contentURI) {
+        String result;
+        Cursor cursor = getContentResolver().query(contentURI, null, null, null, null);
+        if (cursor == null) { // Source is Dropbox or other similar local file path
+            result = contentURI.getPath();
+        } else {
+            cursor.moveToFirst();
+            int idx = cursor.getColumnIndex(MediaStore.Images.ImageColumns.DATA);
+            result = cursor.getString(idx);
+            cursor.close();
+        }
+        return result;
+    }
+
+
+    public void nextScreen(View view) {
+
+        startActivity(new Intent(this, NextActivity.class));
     }
 }

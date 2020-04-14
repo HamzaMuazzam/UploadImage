@@ -47,6 +47,11 @@
             android:layout_height="wrap_content"
             android:padding="5dp"
             android:text="FileName 1: " />
-
+<Button
+    android:layout_width="match_parent"
+    android:layout_margin="10dp"
+    android:onClick="nextScreen"
+    android:layout_height="wrap_content"
+    android:text="nextScreen"/>
     </LinearLayout>
 </ScrollView>
